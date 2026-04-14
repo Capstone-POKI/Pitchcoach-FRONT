@@ -1,6 +1,4 @@
 "use client";
-
-import React from "react";
 import { useRouter } from "next/navigation";
 
 interface BottomChooseBarProps {
@@ -25,7 +23,7 @@ export default function BottomChooseBar({
     },
     voice: {
       label: "피칭 분석하기",
-      path: "/new/voice/recording",
+      path: "/new/voice/upload",
     },
   };
 

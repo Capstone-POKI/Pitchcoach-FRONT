@@ -21,8 +21,10 @@ export default function Page() {
       } else {
         router.push("/home");
       }
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "로그인에 실패했습니다.";
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { message?: string } } }).response?.data
+          ?.message || "로그인에 실패했습니다.";
       alert(msg);
     }
   };

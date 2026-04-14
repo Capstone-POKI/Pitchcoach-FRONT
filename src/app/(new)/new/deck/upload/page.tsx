@@ -26,9 +26,13 @@ export default function IRDeckUploadPage() {
     try {
       setLoading(true);
       const result = await PostIrDeckAnalyze(pitchId, file);
-      router.push(`/new/deck/analysis?pitch_id=${pitchId}&ir_deck_id=${result.ir_deck_id}`);
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || "";
+      router.push(
+        `/new/deck/analysis?pitch_id=${pitchId}&ir_deck_id=${result.ir_deck_id}`,
+      );
+    } catch (error: unknown) {
+      const errorMsg =
+        (error as { response?: { data?: { message?: string } } }).response?.data
+          ?.message || "";
       if (errorMsg.includes("limit")) {
         alert("파일 용량이 너무 큽니다. 10MB 이하의 PDF를 업로드해주세요.");
       } else {
@@ -52,10 +56,15 @@ export default function IRDeckUploadPage() {
             </p>
           </div>
 
-          <label className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-200 rounded-xl bg-white transition-colors cursor-pointer group ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}>
+          <label
+            className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-200 rounded-xl bg-white transition-colors cursor-pointer group ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}
+          >
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
               <div className="p-4 bg-blue-50 rounded-full mb-4 group-hover:scale-110 transition-transform">
-                <Icon icon={loading ? "mdi:loading" : "mdi:upload"} className={`w-8 h-8 text-blue-500 ${loading ? "animate-spin" : ""}`} />
+                <Icon
+                  icon={loading ? "mdi:loading" : "mdi:upload"}
+                  className={`w-8 h-8 text-blue-500 ${loading ? "animate-spin" : ""}`}
+                />
               </div>
 
               <p className="mb-1 text-lg font-semibold text-gray-900">
@@ -75,10 +84,7 @@ export default function IRDeckUploadPage() {
         </div>
       </div>
 
-      <BottomNextBar 
-        disabled={!file || loading} 
-        onClick={handleNext} 
-      />
+      <BottomNextBar disabled={!file || loading} onClick={handleNext} />
     </div>
   );
 }

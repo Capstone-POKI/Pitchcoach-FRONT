@@ -195,7 +195,8 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
                     <Image
                       src={slide.thumbnail_url}
                       alt={`Slide ${slide.slide_number} thumbnail`}
-                      fill
+                      fill // ✅ fill 추가
+                      sizes="200px" // ✅ 최적화 사이즈 명시
                       className="object-cover"
                     />
                   ) : (
@@ -207,7 +208,7 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
                     </div>
                   )}
                   {type === "deck" && (
-                    <div className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                    <div className="absolute top-2 right-2 z-10 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                       {slide.score}점
                     </div>
                   )}
@@ -243,14 +244,14 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
 
       <div className="mt-8 grid grid-cols-2 gap-10 items-start">
         <div className="flex flex-col w-full">
-          <div className="aspect-video w-full rounded-[16px] bg-black overflow-hidden shadow-lg border border-gray-100">
+          <div className="aspect-video w-full rounded-[16px] bg-black relative overflow-hidden shadow-sm border border-gray-100">
             {selected.thumbnail_url ? (
               <Image
                 src={selected.thumbnail_url}
                 alt={`Slide ${selected.slide_number} main`}
                 fill
                 priority
-                className="object-contain"
+                sizes="(max-width: 1100px) 50vw, 550px"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

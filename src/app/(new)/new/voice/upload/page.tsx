@@ -29,8 +29,10 @@ export default function PitchRecordingPage() {
     const savedSlides = sessionStorage.getItem("pitch_slides");
     if (savedSlides) {
       try {
-        const parsedSlides = JSON.parse(savedSlides);
-        setSlides(parsedSlides);
+        const parsed = JSON.parse(savedSlides);
+        setTimeout(() => {
+          setSlides(parsed);
+        }, 0);
       } catch (error) {
         console.error(error);
       }
@@ -39,10 +41,12 @@ export default function PitchRecordingPage() {
 
   const totalSlides = slides.length > 0 ? slides.length : 1;
 
-  const stopRecordingAndGetBlob = (): Promise<Blob> => {
+  const stopRecordingAndGetBlob = useCallback((): Promise<Blob> => {
     return new Promise((resolve) => {
-      if (!mediaRecorderRef.current) return;
-
+      if (!mediaRecorderRef.current) {
+        resolve(new Blob());
+        return;
+      }
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
@@ -50,10 +54,9 @@ export default function PitchRecordingPage() {
         setRecordedBlob(audioBlob);
         resolve(audioBlob);
       };
-
       mediaRecorderRef.current.stop();
     });
-  };
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -61,13 +64,9 @@ export default function PitchRecordingPage() {
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
       };
-
       mediaRecorder.start(1000);
       setIsRecording(true);
       setIsPaused(false);
@@ -84,9 +83,8 @@ export default function PitchRecordingPage() {
 
   const handleRestart = () => {
     if (confirm("녹음을 처음부터 다시 시작하시겠습니까?")) {
-      if (mediaRecorderRef.current && isRecording) {
+      if (mediaRecorderRef.current && isRecording)
         mediaRecorderRef.current.stop();
-      }
       setRecordedBlob(null);
       setIsRecording(false);
       setIsPaused(false);
@@ -107,12 +105,31 @@ export default function PitchRecordingPage() {
       setIsPaused(true);
     }
   };
+  const handleStopRecording = async () => {
+    if (!isRecording || !mediaRecorderRef.current) return;
+
+    const now = performance.now();
+    const elapsed = parseFloat(((now - (startTime || now)) / 1000).toFixed(1));
+
+    setTimestamps((prev) => {
+      const updated = [...prev];
+      if (updated[currentSlide - 1]) {
+        updated[currentSlide - 1].end_timestamp = elapsed;
+      }
+      return updated;
+    });
+
+    const blob = await stopRecordingAndGetBlob();
+
+    setRecordedBlob(blob);
+    setIsRecording(false);
+    setIsPaused(false);
+  };
 
   const handleNextSlide = () => {
     if (currentSlide >= totalSlides || !startTime) return;
     const now = performance.now();
     const elapsed = parseFloat(((now - startTime) / 1000).toFixed(1));
-
     setTimestamps((prev) => {
       const updated = [...prev];
       updated[currentSlide - 1].end_timestamp = elapsed;
@@ -126,27 +143,12 @@ export default function PitchRecordingPage() {
     setCurrentSlide((prev) => prev + 1);
   };
 
-  const stopRecording = async () => {
-    if (mediaRecorderRef.current && startTime) {
-      const now = performance.now();
-      const elapsed = parseFloat(((now - startTime) / 1000).toFixed(1));
-
-      setTimestamps((prev) => {
-        const updated = [...prev];
-        if (updated[currentSlide - 1]) {
-          updated[currentSlide - 1].end_timestamp = elapsed;
-        }
-        return updated;
-      });
-
-      await stopRecordingAndGetBlob();
-      setIsRecording(false);
-      setIsPaused(false);
+  const handleSubmit = async () => {
+    console.log("1. handleSubmit 호출됨", { isSubmitting, pitchId });
+    if (isSubmitting || !pitchId) {
+      console.warn("2. 진입 컷됨", { isSubmitting, pitchId });
+      return;
     }
-  };
-
-  const handleSubmit = useCallback(async () => {
-    if (isSubmitting) return;
 
     setIsSubmitting(true);
 
@@ -155,18 +157,37 @@ export default function PitchRecordingPage() {
       const finalTimestamps = [...timestamps];
 
       if (isRecording && mediaRecorderRef.current) {
+        console.log("3. 녹음 중단 시도");
         const now = performance.now();
         const elapsed = parseFloat(
-          ((now - (startTime || 0)) / 1000).toFixed(1),
+          ((now - (startTime || now)) / 1000).toFixed(1),
         );
-        finalTimestamps[currentSlide - 1].end_timestamp = elapsed;
+
+        if (finalTimestamps[currentSlide - 1]) {
+          finalTimestamps[currentSlide - 1].end_timestamp = elapsed;
+        }
+
         finalBlob = await stopRecordingAndGetBlob();
+        console.log("4. 녹음 중단 완료 및 Blob 획득", finalBlob);
+
         setIsRecording(false);
+        setIsPaused(false);
       }
 
-      if (!finalBlob || finalBlob.size === 0 || !pitchId) {
-        throw new Error("Data not ready");
+      console.log("5. 최종 Blob 체크", finalBlob?.size);
+      if (!finalBlob || finalBlob.size === 0) {
+        console.error("6. Blob 없음");
+        setIsSubmitting(false);
+        alert("녹음 데이터가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.");
+        return;
       }
+
+      console.log("7. API 전송 시작", { pitchId, finalTimestamps });
+
+      console.log(
+        "📊 slide_timestamps:",
+        JSON.stringify(finalTimestamps, null, 2),
+      );
 
       const res = await uploadAndAnalyzeVoice(
         pitchId,
@@ -174,26 +195,31 @@ export default function PitchRecordingPage() {
         finalTimestamps,
       );
 
-      if (res) {
+      console.log("8. API 응답 완료", res);
+
+      if (res?.voice_analysis_id) {
         router.push(
           `/new/voice/analysis?pitch_id=${pitchId}&voice_id=${res.voice_analysis_id}`,
         );
+        return;
       }
-    } catch (error) {
-      console.error(error);
-      alert("분석 요청 중 오류가 발생했습니다.");
+    } catch (error: unknown) {
+      console.error("X. 에러 발생:", error);
+
+      if (error instanceof Error) {
+        const isTimeout =
+          error.message.includes("timeout") ||
+          (error as { code?: string }).code === "ECONNABORTED";
+
+        if (isTimeout) {
+          router.push(`/new/voice/analysis?pitch_id=${pitchId}`);
+          return;
+        }
+      }
+
       setIsSubmitting(false);
     }
-  }, [
-    recordedBlob,
-    isRecording,
-    pitchId,
-    timestamps,
-    startTime,
-    currentSlide,
-    isSubmitting,
-    router,
-  ]);
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center pt-10 pb-32">
@@ -205,15 +231,13 @@ export default function PitchRecordingPage() {
               슬라이드를 넘기면서 녹음을 진행하세요
             </p>
           </div>
-
           <div className="flex gap-3">
             {!isRecording && !recordedBlob ? (
               <button
                 onClick={startRecording}
                 className="bg-[#2563EB] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#1D4ED8] transition flex items-center gap-2 shadow-md"
               >
-                <Icon icon="mdi:microphone" className="w-5 h-5" />
-                녹음 시작
+                <Icon icon="mdi:microphone" className="w-5 h-5" /> 녹음 시작
               </button>
             ) : (
               <>
@@ -221,8 +245,7 @@ export default function PitchRecordingPage() {
                   onClick={handleRestart}
                   className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-gray-50 transition"
                 >
-                  <Icon icon="mdi:refresh" className="w-5 h-5" />
-                  재시작
+                  <Icon icon="mdi:refresh" className="w-5 h-5" /> 재시작
                 </button>
                 {isRecording && (
                   <>
@@ -237,7 +260,7 @@ export default function PitchRecordingPage() {
                       {isPaused ? "다시 시작" : "일시정지"}
                     </button>
                     <button
-                      onClick={stopRecording}
+                      onClick={handleStopRecording}
                       className="bg-[#D33B4D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:opacity-90 transition shadow-sm"
                     >
                       <Icon
@@ -253,44 +276,43 @@ export default function PitchRecordingPage() {
           </div>
         </div>
 
-        <div className="relative w-full bg-white rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-100 p-12">
-          <div className="absolute top-6 right-14 text-[13px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-            {currentSlide} / {totalSlides}
-          </div>
-
-          <div className="relative w-full aspect-[16/9] bg-[#F9FAFB] rounded-2xl overflow-hidden border border-gray-200 flex items-center justify-center">
-            <div className="relative w-full h-full flex items-center justify-center">
+        <div className="relative w-full bg-white rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-100 p-8">
+          {slides.length > 0 && (
+            <div className="absolute top-3 right-14 text-[13px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full z-50">
+              {currentSlide} / {totalSlides}
+            </div>
+          )}
+          <div className="relative top-4 w-full aspect-[16/9] bg-[#F9FAFB] rounded-2xl overflow-hidden border border-gray-200">
+            <div className="absolute inset-0 z-10">
               {slides.length > 0 ? (
                 <Image
                   src={slides[currentSlide - 1].url}
                   alt={`Slide ${currentSlide}`}
                   fill
-                  className="object-contain"
+                  sizes="100vw"
                   priority
                 />
               ) : (
-                <div className="flex flex-col items-center gap-3">
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
                   <Icon
                     icon="mdi:image-off-outline"
                     className="w-12 h-12 text-gray-200"
                   />
                   <span className="text-gray-300 italic text-xl font-light">
-                    슬라이드 이미지가 없습니다.
+                    슬라이드를 불러오고 있습니다...
                   </span>
                 </div>
               )}
             </div>
-
-            {currentSlide < totalSlides && isRecording && !isPaused && (
+            {slides.length > 0 && currentSlide < totalSlides && (
               <button
                 onClick={handleNextSlide}
-                className="absolute right-6 w-14 h-14 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition-all z-10 shadow-lg active:scale-95"
+                className="absolute right-8 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white transition-all z-[100] shadow-2xl active:scale-95 border border-white/20"
               >
-                <Icon icon="mdi:chevron-right" className="w-10 h-10" />
+                <Icon icon="mdi:chevron-right" className="w-12 h-12" />
               </button>
             )}
-
-            <div className="absolute bottom-6 flex gap-2.5">
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2.5 z-20">
               {slides.length > 0 &&
                 [...Array(totalSlides)].map((_, i) => (
                   <div
@@ -302,9 +324,8 @@ export default function PitchRecordingPage() {
           </div>
         </div>
       </div>
-
       <BottomNextBar
-        disabled={(!recordedBlob && !isRecording) || isSubmitting}
+        disabled={!pitchId || !recordedBlob || isSubmitting}
         onClick={handleSubmit}
       />
     </div>

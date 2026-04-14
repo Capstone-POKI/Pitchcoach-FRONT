@@ -110,6 +110,7 @@ export const uploadAndAnalyzeVoice = async (
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      timeout: 0,
     },
   );
 
