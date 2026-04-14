@@ -21,12 +21,12 @@ export default function IRAnalysisPage() {
 
   const fetchData = useCallback(async () => {
     if (!deckId || isFetching.current) return;
-    
+
     try {
       isFetching.current = true;
       const res = await GetIrDeckDetail(deckId);
-      
-      setData(prev => {
+
+      setData((prev) => {
         if (JSON.stringify(prev) === JSON.stringify(res)) return prev;
         return res;
       });
@@ -50,7 +50,7 @@ export default function IRAnalysisPage() {
     if (data?.analysis_status === "IN_PROGRESS") {
       const interval = setInterval(() => {
         fetchData();
-      }, 5000);
+      }, 10000);
       return () => clearInterval(interval);
     }
   }, [data?.analysis_status, fetchData]);

@@ -7,7 +7,7 @@ import { useState } from "react";
 interface BottomActionBarProps {
   disabled?: boolean;
   nextHref?: string;
-  onClick?: () => Promise<void>; // onClick 속성 추가
+  onClick?: () => void | Promise<void>;
 }
 
 export default function BottomNextBar({
@@ -24,18 +24,15 @@ export default function BottomNextBar({
     try {
       setIsLoading(true);
 
-      // 1. 전달받은 onClick(API 호출 등)이 있다면 실행
       if (onClick) {
         await onClick();
       }
 
-      // 2. 작업 완료 후 페이지 이동
       if (nextHref) {
         router.push(nextHref);
       }
     } catch (error) {
       console.error("Next step failed:", error);
-      // 필요 시 에러 알림 처리
     } finally {
       setIsLoading(false);
     }

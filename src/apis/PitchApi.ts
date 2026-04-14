@@ -12,7 +12,8 @@ import {
   SlideTimestamp,
   VoiceUploadResponse,
 } from "@/types/VoiceAnalysisType";
-import { QAMode, UpdateQAModeResponse } from "@/types/QNAAnalysisType";
+import { GetQAListResponse, QAMode } from "@/types/QNAAnalysisType";
+import axios from "axios";
 
 export const GetPitches = async (params?: GetPitchesParams) => {
   const response = await api.get("/api/pitches", { params });
@@ -127,11 +128,33 @@ export const getVoiceAnalysisDetail = async (
 export const updatePitchQAMode = async (
   pitchId: string,
   qaMode: QAMode,
-): Promise<UpdateQAModeResponse> => {
-  const response = await api.patch<UpdateQAModeResponse>(
-    `/api/pitches/${pitchId}/qa-mode`,
-    {
+  forceRegenerate: boolean = false,
+): Promise<void> => {
+  try {
+    await api.patch(`/api/pitches/${pitchId}/qa-mode`, {
       qa_mode: qaMode,
+      force_regenerate: forceRegenerate,
+    });
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error) && error.response?.status === 409) {
+      const serverMessage = error.response?.data?.message;
+      alert(serverMessage || "음성 분석이 완료된 후 시도해 주세요.");
+      return;
+    }
+    throw error;
+  }
+};
+
+export const getPitchQuestions = async (
+  pitchId: string,
+  regenerateGuides: boolean = false,
+): Promise<GetQAListResponse> => {
+  const response = await api.get<GetQAListResponse>(
+    `/api/pitches/${pitchId}/questions`,
+    {
+      params: {
+        regenerate_guides: regenerateGuides,
+      },
     },
   );
   return response.data;

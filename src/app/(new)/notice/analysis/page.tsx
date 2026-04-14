@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import BottomChooseBar from "@/components/common/BottomChooseBar";
+import BottomChooseBar from "@/components/common/BottomNextBar";
 import { Icon } from "@iconify/react";
 import { GetNoticeResponse } from "@/types/PitchType";
 import { GetNoticeDetail, PatchNotice } from "@/apis/PitchApi";
+
+interface BaseInfo {
+  notice_name: string;
+  host_organization: string;
+  recruitment_type: string;
+  target_audience: string;
+  application_period: string;
+}
+
+type Criterion = NonNullable<GetNoticeResponse["evaluation_criteria"]>[number];
 
 export default function Page() {
   const router = useRouter();
@@ -16,39 +26,38 @@ export default function Page() {
   const [data, setData] = useState<GetNoticeResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [baseInfoState, setBaseInfoState] = useState({
+  const [baseInfoState, setBaseInfoState] = useState<BaseInfo>({
     notice_name: "",
     host_organization: "",
     recruitment_type: "",
     target_audience: "",
     application_period: "",
   });
-  const [criteria, setCriteria] = useState<any[]>([]);
+  const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [extraCriterion, setExtraCriterion] = useState("");
 
-  const fetchData = useCallback(async () => {
-    if (!noticeId) return;
-    try {
-      const res = await GetNoticeDetail(noticeId);
-      setData(res);
+  const isInitialized = useRef(false);
+  const isFetching = useRef(false);
 
-      if (res.analysis_status === "COMPLETED") {
-        setBaseInfoState({
-          notice_name: res.notice_name || "",
-          host_organization: res.host_organization || "",
-          recruitment_type: res.recruitment_type || "",
-          target_audience: res.target_audience || "",
-          application_period: res.application_period || "",
-        });
-        setCriteria(res.evaluation_criteria || []);
-        setExtraCriterion(res.additional_criteria || "");
-        setLoading(false);
-      } else if (res.analysis_status === "FAILED") {
+  const fetchData = useCallback(async () => {
+    if (!noticeId || isFetching.current) return;
+    try {
+      isFetching.current = true;
+      const res = await GetNoticeDetail(noticeId);
+
+      setData((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(res)) return prev;
+        return res;
+      });
+
+      if (res.analysis_status !== "IN_PROGRESS") {
         setLoading(false);
       }
     } catch (error) {
       console.error(error);
       setLoading(false);
+    } finally {
+      isFetching.current = false;
     }
   }, [noticeId]);
 
@@ -57,13 +66,33 @@ export default function Page() {
   }, [fetchData]);
 
   useEffect(() => {
-    if (data?.analysis_status === "IN_PROGRESS") {
-      const interval = setInterval(() => {
-        fetchData();
-      }, 10000);
-      return () => clearInterval(interval);
+    if (data?.analysis_status === "COMPLETED" && !isInitialized.current) {
+      setBaseInfoState({
+        notice_name: data.notice_name || "",
+        host_organization: data.host_organization || "",
+        recruitment_type: data.recruitment_type || "",
+        target_audience: data.target_audience || "",
+        application_period: data.application_period || "",
+      });
+      setCriteria(data.evaluation_criteria || []);
+      const extraValue =
+        typeof data.additional_criteria === "string"
+          ? data.additional_criteria
+          : "";
+      setExtraCriterion(extraValue);
+      isInitialized.current = true;
     }
-  }, [data?.analysis_status, fetchData]);
+  }, [data]);
+
+  useEffect(() => {
+    if (data?.analysis_status !== "IN_PROGRESS" || !noticeId) return;
+
+    const interval = setInterval(() => {
+      fetchData();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [data?.analysis_status, noticeId, fetchData]);
 
   const handleToggleEdit = async () => {
     if (isEditing && noticeId) {
@@ -84,8 +113,10 @@ export default function Page() {
           })),
           additional_criteria: extraCriterion,
         });
+        isInitialized.current = false;
+        setLoading(true);
         await fetchData();
-      } catch (error: any) {
+      } catch {
         alert("수정 중 오류가 발생했습니다.");
         return;
       }
@@ -122,7 +153,6 @@ export default function Page() {
     const isPageLimitError =
       data.error_message?.includes("PAGE_LIMIT_EXCEEDED") ||
       data.error_message?.includes("exceed the limit");
-
     return (
       <div className="flex h-[60vh] w-full flex-col items-center justify-center gap-4">
         <Icon
@@ -151,6 +181,14 @@ export default function Page() {
 
   if (!data) return null;
 
+  const infoConfig = [
+    { key: "notice_name" as keyof BaseInfo, label: "공고/행사명" },
+    { key: "host_organization" as keyof BaseInfo, label: "주관 기관" },
+    { key: "recruitment_type" as keyof BaseInfo, label: "모집 유형" },
+    { key: "target_audience" as keyof BaseInfo, label: "지원 자격" },
+    { key: "application_period" as keyof BaseInfo, label: "주요 일정" },
+  ];
+
   return (
     <div className="mx-auto max-w-screen-lg space-y-8 pb-24">
       <div className="flex items-start justify-between">
@@ -171,13 +209,7 @@ export default function Page() {
       <div className="rounded-xl bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-slate-900">기본 정보</h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-          {[
-            { key: "notice_name", label: "공고/행사명" },
-            { key: "host_organization", label: "주관 기관" },
-            { key: "recruitment_type", label: "모집 유형" },
-            { key: "target_audience", label: "지원 자격" },
-            { key: "application_period", label: "주요 일정" },
-          ].map((info) => (
+          {infoConfig.map((info) => (
             <div key={info.key}>
               <p className="mb-1 text-xs font-medium text-slate-500">
                 {info.label}
@@ -185,7 +217,7 @@ export default function Page() {
               {isEditing ? (
                 <input
                   className="w-full rounded-md bg-gray-100 px-3 py-2 text-sm text-slate-800 outline-none"
-                  value={(baseInfoState as any)[info.key]}
+                  value={baseInfoState[info.key]}
                   onChange={(e) =>
                     setBaseInfoState({
                       ...baseInfoState,
@@ -195,7 +227,7 @@ export default function Page() {
                 />
               ) : (
                 <div className="rounded-md bg-gray-100 px-3 py-2 text-sm text-slate-800">
-                  {(baseInfoState as any)[info.key] || "-"}
+                  {baseInfoState[info.key] || "-"}
                 </div>
               )}
             </div>
@@ -219,7 +251,10 @@ export default function Page() {
                         value={item.criteria_name}
                         onChange={(e) => {
                           const next = [...criteria];
-                          next[idx].criteria_name = e.target.value;
+                          next[idx] = {
+                            ...next[idx],
+                            criteria_name: e.target.value,
+                          };
                           setCriteria(next);
                         }}
                       />
@@ -235,7 +270,10 @@ export default function Page() {
                         value={item.points}
                         onChange={(e) => {
                           const next = [...criteria];
-                          next[idx].points = e.target.value;
+                          next[idx] = {
+                            ...next[idx],
+                            points: Number(e.target.value),
+                          };
                           setCriteria(next);
                         }}
                       />
@@ -317,7 +355,7 @@ export default function Page() {
         </div>
       </div>
 
-      <BottomChooseBar type="deck" onClick={handleNext} />
+      <BottomChooseBar onClick={handleNext} />
     </div>
   );
 }

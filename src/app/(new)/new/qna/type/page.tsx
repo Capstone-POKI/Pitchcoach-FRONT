@@ -21,17 +21,14 @@ export default function QnATrainingPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await updatePitchQAMode(pitchId, selectedOption);
-      if (res) {
-        const nextPath =
-          selectedOption === "GUIDE_ONLY"
-            ? "/new/qna/list"
-            : "/new/qna/practice";
-        router.push(`${nextPath}?pitch_id=${pitchId}`);
-      }
+      await updatePitchQAMode(pitchId, selectedOption, false);
+
+      const nextPath =
+        selectedOption === "GUIDE_ONLY" ? "/new/qna/list" : "/new/qna/practice";
+
+      router.push(`${nextPath}?pitch_id=${pitchId}`);
     } catch (error) {
       console.error(error);
-      alert("훈련 모드 설정 중 오류가 발생했습니다.");
       setIsSubmitting(false);
     }
   }, [selectedOption, pitchId, isSubmitting, router]);

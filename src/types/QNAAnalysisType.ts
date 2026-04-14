@@ -21,3 +21,32 @@ export interface UpdateQAModeResponse {
     questions_api: string;
   };
 }
+
+export interface QAQuestion {
+  question_id: string;
+  category:
+    | "PROBLEM"
+    | "SOLUTION"
+    | "MARKET_BIZ"
+    | "PERFORMANCE"
+    | "TEAM"
+    | "FUNDING"
+    | "JUDGE_TYPE";
+  display_order: number;
+  question: string;
+  answer_guide: string;
+  has_answer: boolean;
+}
+
+export interface GetQAListResponse {
+  pitch_id: string;
+  qa_training: {
+    qa_training_id: string;
+    mode: "GUIDE_ONLY" | "REALTIME";
+    total_questions: number;
+    version: number;
+    is_latest: boolean;
+  };
+  questions: QAQuestion[];
+  updated_at: string;
+}

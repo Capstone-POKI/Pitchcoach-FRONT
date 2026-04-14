@@ -5,12 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { GetIrDeckSlides, GetVoiceAnalysisSlides } from "@/apis/PitchApi";
 import { Slide } from "@/types/IRAnalysisType";
+import Image from "next/image";
 
 type SlideFeedbackProps = {
   type: "deck" | "voice";
 };
 
-// 공통 더보기 섹션 컴포넌트
 const ExpandableSection = ({
   title,
   content,
@@ -18,7 +18,7 @@ const ExpandableSection = ({
   bgColor,
   iconColor,
   isList = false,
-  maxHeight = 90, // 기본 접힘 높이
+  maxHeight = 90,
 }: {
   title: string;
   content: string | string[];
@@ -34,16 +34,10 @@ const ExpandableSection = ({
 
   useEffect(() => {
     if (contentRef.current) {
-      // 설정된 maxHeight보다 실제 내용(scrollHeight)이 크면 더보기 버튼 활성화
       const isOverflowing = contentRef.current.scrollHeight > maxHeight;
       setHasMore(isOverflowing);
     }
   }, [content, maxHeight]);
-
-  // 슬라이드가 바뀌어 content가 변경될 때 접힘 상태로 초기화
-  useEffect(() => {
-    setIsExpanded(false);
-  }, [content]);
 
   return (
     <div
@@ -101,20 +95,40 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isFetching = useRef(false);
+
   const fetchData = useCallback(async () => {
+    const targetId = type === "deck" ? deckId : voiceId;
+    if (!targetId || isFetching.current) return;
+
     try {
-      setLoading(true);
+      isFetching.current = true;
+
       let res;
-      if (type === "deck" && deckId) {
-        res = await GetIrDeckSlides(deckId);
-      } else if (type === "voice" && voiceId) {
-        res = await GetVoiceAnalysisSlides(voiceId);
+      if (type === "deck") {
+        res = await GetIrDeckSlides(targetId);
+      } else {
+        res = await GetVoiceAnalysisSlides(targetId);
       }
-      if (res?.slides) setSlides(res.slides);
+
+      if (res?.slides) {
+        const newSlides = res.slides;
+        setSlides((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(newSlides)) return prev;
+          return newSlides;
+        });
+
+        const slideUrls = newSlides.map((s: Slide) => ({
+          url: s.thumbnail_url,
+          number: s.slide_number,
+        }));
+        sessionStorage.setItem("pitch_slides", JSON.stringify(slideUrls));
+      }
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
   }, [type, deckId, voiceId]);
 
@@ -154,7 +168,6 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
         </p>
       </div>
 
-      {/* 상단 슬라이드 네비게이터 */}
       <div className="relative mt-5 flex items-center justify-center">
         <button
           onClick={() => setSelectedIndex((prev) => Math.max(0, prev - 1))}
@@ -179,10 +192,11 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
               >
                 <div className="h-[100px] bg-gray-100 rounded-md mb-3 relative overflow-hidden">
                   {slide.thumbnail_url ? (
-                    <img
+                    <Image
                       src={slide.thumbnail_url}
-                      alt=""
-                      className="w-full h-full object-cover"
+                      alt={`Slide ${slide.slide_number} thumbnail`}
+                      fill
+                      className="object-cover"
                     />
                   ) : (
                     <div className="w-full h-full bg-gray-200 flex items-center justify-center">
@@ -228,14 +242,15 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-10 items-start">
-        {/* 왼쪽: 이미지 및 요약 */}
         <div className="flex flex-col w-full">
           <div className="aspect-video w-full rounded-[16px] bg-black overflow-hidden shadow-lg border border-gray-100">
             {selected.thumbnail_url ? (
-              <img
+              <Image
                 src={selected.thumbnail_url}
-                alt=""
-                className="w-full h-full object-contain"
+                alt={`Slide ${selected.slide_number} main`}
+                fill
+                priority
+                className="object-contain"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -258,7 +273,6 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
             </span>
           </div>
 
-          {/* ✅ 슬라이드 요약에 ExpandableSection 적용 (배경은 흰색/보더 유지) */}
           <div className="mt-4">
             <ExpandableSection
               title="슬라이드 요약"
@@ -266,7 +280,7 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
               icon="mdi:text-box-search-outline"
               bgColor="bg-white border border-gray-100"
               iconColor="text-blue-500"
-              maxHeight={75} // 요약은 조금 더 컴팩트하게
+              maxHeight={75}
             />
           </div>
 
@@ -290,7 +304,6 @@ export default function SlideFeedback({ type }: SlideFeedbackProps) {
           </div>
         </div>
 
-        {/* 오른쪽: 상세 피드백 영역 */}
         <div className="flex flex-col gap-4 w-full">
           <ExpandableSection
             title="상세 피드백"

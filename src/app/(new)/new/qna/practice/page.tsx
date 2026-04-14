@@ -58,16 +58,13 @@ export default function QARecorder() {
 
   return (
     <div className="bg-gray-50 flex flex-col justify-center items-center pt-30 px-4">
-      {/* 카드 */}
       <div className="w-full max-w-3xl bg-white rounded-2xl shadow p-8">
-        {/* 상단 진행 */}
         <div className="flex justify-between items-center mb-3">
           <span className="text-sm text-gray-500">
             질문 {currentIndex + 1} / 5
           </span>
         </div>
 
-        {/* 진행 바 */}
         <div className="w-full h-2 bg-gray-200 rounded-full mb-6">
           <div
             className="h-2 bg-blue-500 rounded-full"
@@ -75,7 +72,6 @@ export default function QARecorder() {
           />
         </div>
 
-        {/* 질문 영역 */}
         <div className="flex items-start gap-3 mb-10">
           <div className="w-10 h-10 flex items-center justify-center bg-blue-500 text-white rounded-full font-semibold">
             Q{currentIndex + 1}
@@ -86,7 +82,6 @@ export default function QARecorder() {
           </div>
         </div>
 
-        {/* 중앙 녹음 영역 */}
         <div className="flex flex-col items-center justify-center gap-4">
           <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center">
             <Icon
@@ -117,7 +112,6 @@ export default function QARecorder() {
           )}
         </div>
       </div>
-      {/* 하단 버튼 */}
       <div className="w-full max-w-3xl mt-6 flex justify-end">
         {currentIndex < 4 ? (
           <button

@@ -29,7 +29,7 @@ export interface GetNoticeResponse {
   target_audience: string | null;
   application_period: string | null;
   evaluation_criteria: EvaluationCriteria[];
-  additional_criteria: any | null;
+  additional_criteria: unknown | null;
   ir_deck_guide: string;
   error_message?: string;
   created_at: string;
