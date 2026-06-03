@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import BottomNextBar from "@/components/common/BottomNextBar";
 import { updatePitchQAMode } from "@/apis/PitchApi";
 
-export default function QnATrainingPage() {
+function QnATrainingContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pitchId = searchParams.get("pitch_id");
@@ -21,7 +21,14 @@ export default function QnATrainingPage() {
 
     setIsSubmitting(true);
     try {
-      await updatePitchQAMode(pitchId, selectedOption, false);
+      const result = await updatePitchQAMode(pitchId, selectedOption, false);
+
+      if (selectedOption === "REALTIME" && result?.questions) {
+        sessionStorage.setItem(
+          `qa_questions_${pitchId}`,
+          JSON.stringify(result.questions),
+        );
+      }
 
       const nextPath =
         selectedOption === "GUIDE_ONLY" ? "/new/qna/list" : "/new/qna/practice";
@@ -99,5 +106,13 @@ export default function QnATrainingPage() {
         onClick={handleSubmit}
       />
     </div>
+  );
+}
+
+export default function QnATrainingPage() {
+  return (
+    <Suspense>
+      <QnATrainingContent />
+    </Suspense>
   );
 }

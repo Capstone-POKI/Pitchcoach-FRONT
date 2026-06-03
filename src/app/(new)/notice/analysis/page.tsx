@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomChooseBar from "@/components/common/BottomNextBar";
 import { Icon } from "@iconify/react";
@@ -17,7 +17,7 @@ interface BaseInfo {
 
 type Criterion = NonNullable<GetNoticeResponse["evaluation_criteria"]>[number];
 
-export default function Page() {
+function PageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const noticeId = searchParams.get("notice_id");
@@ -357,5 +357,13 @@ export default function Page() {
 
       <BottomChooseBar onClick={handleNext} />
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <PageContent />
+    </Suspense>
   );
 }

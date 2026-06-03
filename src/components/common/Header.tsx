@@ -8,8 +8,8 @@ export default function Header() {
   const pathname = usePathname();
 
   const navItems = [
-    { label: "현재 Pitch", href: "/home" },
     { label: "Pitch 목록", href: "/list" },
+    { label: "현재 Pitch", href: "/home" },
   ];
 
   return (

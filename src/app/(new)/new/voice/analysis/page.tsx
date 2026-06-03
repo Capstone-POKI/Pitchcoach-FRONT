@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import FeedbackSummary from "@/components/analysis/FeedbackSummary";
 import SlideFeedback from "@/components/analysis/SlideFeedback";
@@ -9,12 +9,12 @@ import { GetVoiceAnalysisResponse } from "@/types/VoiceAnalysisType";
 import { getVoiceAnalysisDetail } from "@/apis/PitchApi";
 import { Icon } from "@iconify/react";
 
-export default function VoiceAnalysisPage() {
+function VoiceAnalysisContent() {
   const searchParams = useSearchParams();
   const voiceId = searchParams.get("voice_id");
 
   const [data, setData] = useState<GetVoiceAnalysisResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!voiceId);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -32,6 +32,8 @@ export default function VoiceAnalysisPage() {
   }, [voiceId]);
 
   useEffect(() => {
+    // fetchData는 async 함수이며 setState를 비동기 콜백에서만 호출함 (false positive)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [fetchData]);
 
@@ -230,5 +232,13 @@ export default function VoiceAnalysisPage() {
       </div>
       <BottomNextBar nextHref={`/new/qna/type?pitch_id=${data.pitch_id}`} />
     </div>
+  );
+}
+
+export default function VoiceAnalysisPage() {
+  return (
+    <Suspense>
+      <VoiceAnalysisContent />
+    </Suspense>
   );
 }

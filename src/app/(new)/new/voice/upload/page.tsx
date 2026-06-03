@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import BottomNextBar from "@/components/common/BottomNextBar";
@@ -8,7 +8,7 @@ import { uploadAndAnalyzeVoice } from "@/apis/PitchApi";
 import { SlideTimestamp } from "@/types/VoiceAnalysisType";
 import Image from "next/image";
 
-export default function PitchRecordingPage() {
+function PitchRecordingContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pitchId = searchParams.get("pitch_id");
@@ -329,5 +329,13 @@ export default function PitchRecordingPage() {
         onClick={handleSubmit}
       />
     </div>
+  );
+}
+
+export default function PitchRecordingPage() {
+  return (
+    <Suspense>
+      <PitchRecordingContent />
+    </Suspense>
   );
 }

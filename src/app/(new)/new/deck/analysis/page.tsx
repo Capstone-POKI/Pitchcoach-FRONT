@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import FeedbackSummary from "@/components/analysis/FeedbackSummary";
 import SlideFeedback from "@/components/analysis/SlideFeedback";
@@ -9,7 +9,7 @@ import { Icon } from "@iconify/react";
 import { GetIrDeckDetail } from "@/apis/PitchApi";
 import { GetIrDeckResponse } from "@/types/PitchType";
 
-export default function IRAnalysisPage() {
+function IRAnalysisContent() {
   const searchParams = useSearchParams();
   const deckId = searchParams.get("ir_deck_id");
 
@@ -227,7 +227,15 @@ export default function IRAnalysisPage() {
           </div>
         </div>
       </div>
-      <BottomChooseBar type="voice" />
+      <BottomChooseBar type="voice" pitchId={data?.pitch_id} />
     </div>
+  );
+}
+
+export default function IRAnalysisPage() {
+  return (
+    <Suspense>
+      <IRAnalysisContent />
+    </Suspense>
   );
 }

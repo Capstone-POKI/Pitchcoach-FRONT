@@ -102,9 +102,12 @@ export default function Page() {
         business_duration: finalPeriod,
       });
 
-      if (result.is_profile_complete) router.push("/home");
-    } catch (error: any) {
-      alert(error.response?.data?.message || "정보 저장 실패");
+      if (result.is_profile_complete) router.push("/list");
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { message?: string } } }).response?.data
+          ?.message || "정보 저장 실패";
+      alert(msg);
     }
   };
 

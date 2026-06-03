@@ -27,7 +27,7 @@ const steps = [
   {
     key: "report",
     label: "리포트 확인",
-    paths: ["/notice/report", "/notice/analysis"],
+    paths: ["/new/report"],
   },
 ];
 

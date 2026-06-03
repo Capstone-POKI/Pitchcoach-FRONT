@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import BottomNextBar from "@/components/common/BottomNextBar";
 import { PostIrDeckAnalyze } from "@/apis/PitchApi";
 
-export default function IRDeckUploadPage() {
+function IRDeckUploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pitchId = searchParams.get("pitch_id");
@@ -86,5 +86,13 @@ export default function IRDeckUploadPage() {
 
       <BottomNextBar disabled={!file || loading} onClick={handleNext} />
     </div>
+  );
+}
+
+export default function IRDeckUploadPage() {
+  return (
+    <Suspense>
+      <IRDeckUploadContent />
+    </Suspense>
   );
 }

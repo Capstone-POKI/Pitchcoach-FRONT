@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomNextBar from "@/components/common/BottomNextBar";
 import { Icon } from "@iconify/react";
 import { PostNoticeAnalyze } from "@/apis/PitchApi";
 
-export default function Page() {
+function PageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -91,5 +91,13 @@ export default function Page() {
 
       <BottomNextBar disabled={!file || loading} onClick={handleNext} />
     </>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <PageContent />
+    </Suspense>
   );
 }

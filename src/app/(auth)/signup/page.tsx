@@ -23,10 +23,12 @@ export default function Page() {
       if (!result.is_profile_complete) {
         router.push("/onboard");
       } else {
-        router.push("/home");
+        router.push("/list");
       }
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "회원가입 실패";
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { message?: string } } }).response?.data
+          ?.message || "회원가입 실패";
       alert(msg);
     }
   };
@@ -125,10 +127,7 @@ export default function Page() {
 
         <p className="mt-4 text-center text-xs text-gray-500">
           이미 계정이 있으신가요?{" "}
-          <Link
-            href="/login"
-            className="cursor-pointer font-medium text-blue-600"
-          >
+          <Link href="/" className="cursor-pointer font-medium text-blue-600">
             로그인
           </Link>
         </p>

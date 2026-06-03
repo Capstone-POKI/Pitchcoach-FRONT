@@ -44,7 +44,7 @@ export default function BottomChooseBar({
     <div className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white px-6 py-4 z-50">
       <div className="mx-auto flex max-w-7xl justify-end gap-3">
         <button
-          onClick={() => router.push("/home")}
+          onClick={() => router.push("/list")}
           className="flex items-center justify-center px-4 py-2.5 text-sm font-bold text-[#3B6CF0] bg-white border border-[#3B6CF0] rounded-xl hover:bg-blue-50 transition-all"
         >
           대시보드로 이동하기

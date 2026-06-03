@@ -1,3 +1,4 @@
+import { GenerateReportResponse, GetReportResponse } from "@/types/ReportType";
 import {
   CreatePitchRequest,
   GetAnalysisSlidesResponse,
@@ -12,7 +13,13 @@ import {
   SlideTimestamp,
   VoiceUploadResponse,
 } from "@/types/VoiceAnalysisType";
-import { GetQAListResponse, QAMode } from "@/types/QNAAnalysisType";
+import {
+  GetAnswerFeedbackResponse,
+  GetQAListResponse,
+  PostAnswerResponse,
+  QAMode,
+  UpdateQAModeResponse,
+} from "@/types/QNAAnalysisType";
 import axios from "axios";
 
 export const GetPitches = async (params?: GetPitchesParams) => {
@@ -130,17 +137,18 @@ export const updatePitchQAMode = async (
   pitchId: string,
   qaMode: QAMode,
   forceRegenerate: boolean = false,
-): Promise<void> => {
+): Promise<UpdateQAModeResponse | null> => {
   try {
-    await api.patch(`/api/pitches/${pitchId}/qa-mode`, {
-      qa_mode: qaMode,
-      force_regenerate: forceRegenerate,
-    });
+    const response = await api.patch<UpdateQAModeResponse>(
+      `/api/pitches/${pitchId}/qa-mode`,
+      { qa_mode: qaMode, force_regenerate: forceRegenerate },
+    );
+    return response.data;
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response?.status === 409) {
       const serverMessage = error.response?.data?.message;
       alert(serverMessage || "음성 분석이 완료된 후 시도해 주세요.");
-      return;
+      return null;
     }
     throw error;
   }
@@ -157,6 +165,47 @@ export const getPitchQuestions = async (
         regenerate_guides: regenerateGuides,
       },
     },
+  );
+  return response.data;
+};
+
+export const getAnswerFeedback = async (
+  answerId: string,
+): Promise<GetAnswerFeedbackResponse> => {
+  const response = await api.get<GetAnswerFeedbackResponse>(
+    `/api/answers/${answerId}`,
+  );
+  return response.data;
+};
+
+export const generateReport = async (
+  pitchId: string,
+): Promise<GenerateReportResponse> => {
+  const response = await api.post<GenerateReportResponse>(
+    `/api/pitches/${pitchId}/report`,
+    {},
+  );
+  return response.data;
+};
+
+export const getReport = async (
+  reportId: string,
+): Promise<GetReportResponse> => {
+  const response = await api.get<GetReportResponse>(`/api/reports/${reportId}`);
+  return response.data;
+};
+
+export const postQuestionAnswer = async (
+  questionId: string,
+  audioBlob: Blob,
+): Promise<PostAnswerResponse> => {
+  const formData = new FormData();
+  formData.append("file", audioBlob, "answer.webm");
+
+  const response = await api.post<PostAnswerResponse>(
+    `/api/questions/${questionId}/answers`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } },
   );
   return response.data;
 };

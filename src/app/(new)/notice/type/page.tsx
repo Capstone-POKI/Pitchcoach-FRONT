@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import BottomNextBar from "@/components/common/BottomNextBar";
 import { PostPitch } from "@/apis/PitchApi";
@@ -23,7 +23,7 @@ const noticeOptions = [
   },
 ];
 
-export default function Page() {
+function PageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<string | null>(null);
@@ -101,5 +101,13 @@ export default function Page() {
 
       <BottomNextBar disabled={!selected} onClick={handleNext} />
     </>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <PageContent />
+    </Suspense>
   );
 }
