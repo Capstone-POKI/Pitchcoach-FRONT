@@ -10,10 +10,10 @@
 - [프로젝트 소개](#프로젝트-소개)
 - [주요 기능](#주요-기능)
 - [기술 스택](#기술-스택)
+- [소스 코드 구조](#소스-코드-구조)
 - [화면 구성 및 사용자 플로우](#화면-구성-및-사용자-플로우)
-- [프론트엔드 구현 상세](#프론트엔드-구현-상세)
-- [디렉터리 구조](#디렉터리-구조)
-- [시작하기](#시작하기)
+- [How to Install](#how-to-install)
+- [How to Build](#how-to-build)
 
 ---
 
@@ -22,6 +22,15 @@
 **PitchCoach**는 스타트업 창업자가 투자자 IR 피칭을 준비하는 전 과정을 AI가 코칭해 주는 웹 플랫폼입니다.
 
 공고문(심사 기준)을 기반으로 IR Deck의 슬라이드를 분석하고, 발표 음성의 전달력·구조를 평가하며, 투자자가 물어볼 예상 질문에 직접 음성으로 답변하고 피드백을 받을 수 있습니다. 모든 분석이 끝나면 레이더 차트·점수 링·토픽 커버리지 바 차트를 포함한 종합 리포트를 생성해 줍니다.
+
+### 핵심 가치
+
+| 문제 | PitchCoach의 해결 |
+|------|------------------|
+| 피드백 받을 투자자가 없다 | AI가 IR Deck을 슬라이드 단위로 분석 |
+| 발표 연습을 혼자 하기 어렵다 | 음성 녹음 → WPM·전달력 자동 분석 |
+| 어떤 질문이 나올지 모른다 | AI가 예상 Q&A를 생성하고 답변 피드백 제공 |
+| 개선 포인트를 한눈에 보기 어렵다 | 레이더 차트·종합 리포트로 시각화 |
 
 ---
 
@@ -52,6 +61,119 @@
 | **Icons** | `@iconify/react` |
 | **HTTP** | Axios + 커스텀 인터셉터 (토큰 자동 첨부 / 갱신) |
 | **Package Manager** | pnpm |
+
+---
+
+## 소스 코드 구조
+
+### 디렉터리 구조
+
+```
+src/
+├── app/                        # Next.js App Router 페이지
+│   ├── (auth)/                 # 인증 관련 페이지
+│   │   ├── login/              # 로그인
+│   │   ├── signup/             # 회원가입
+│   │   └── onboard/            # 온보딩 프로필 설정
+│   ├── (main)/                 # 메인 서비스 페이지
+│   │   ├── home/               # 홈 화면
+│   │   └── list/               # Pitch 목록 (검색, 필터)
+│   ├── (new)/                  # 피칭 플로우 페이지
+│   │   ├── notice/             # 공고문 등록 (basic → type → upload → analysis)
+│   │   └── new/
+│   │       ├── deck/           # IR Deck 업로드 → 분석
+│   │       ├── voice/          # 음성 녹음 → 분석
+│   │       ├── qna/            # Q&A 유형 → 목록 → 연습 → 피드백
+│   │       └── report/         # 종합 리포트
+│   └── mypage/                 # 마이페이지
+├── components/
+│   ├── analysis/               # FeedbackSummary, SlideFeedback
+│   ├── common/                 # Header, Sidebar, StepNavbar, BottomNextBar, BottomChooseBar
+│   ├── modal/                  # PwModal
+│   ├── pitch/                  # PitchCard
+│   └── ui/                     # Radix UI 래퍼 (Dialog, Popover, Tabs, Command)
+├── apis/
+│   ├── AxiosInstance.ts        # 토큰 인터셉터 포함 Axios 인스턴스
+│   ├── PitchApi.ts             # 피칭 관련 API 함수
+│   └── SignupApi.ts            # 인증 API 함수
+├── types/                      # TypeScript 타입 정의
+│   ├── PitchType.ts
+│   ├── IRAnalysisType.ts
+│   ├── VoiceAnalysisType.ts
+│   ├── QNAAnalysisType.ts
+│   ├── ReportType.ts
+│   └── SignupType.ts
+└── lib/
+    └── utils.ts                # 공통 유틸리티 (clsx + tailwind-merge)
+```
+
+### 주요 구현 상세
+
+#### 1. App Router 기반 라우트 그룹 설계
+
+Next.js App Router의 라우트 그룹을 활용해 인증(`(auth)`), 메인(`(main)`), 피칭 플로우(`(new)`) 영역을 레이아웃 단위로 분리했습니다.  
+각 그룹은 공통 레이아웃(Sidebar, Header, StepNavbar)을 독립적으로 가지며 불필요한 리렌더링 없이 단계별 UI를 구성합니다.
+
+#### 2. 비동기 AI 분석 — 폴링(Polling) 패턴
+
+AI 분석은 수십 초~수 분이 소요되는 비동기 작업입니다.  
+분석 상태가 `IN_PROGRESS`인 동안 `setInterval`로 백엔드를 주기적으로 폴링하고, `COMPLETED` 또는 `FAILED` 상태가 반환되면 인터벌을 정리합니다.
+
+```typescript
+// IR Deck 분석 폴링 (10초 간격)
+useEffect(() => {
+  if (data?.analysis_status === "IN_PROGRESS") {
+    const interval = setInterval(() => fetchData(), 10000);
+    return () => clearInterval(interval);
+  }
+}, [data?.analysis_status, fetchData]);
+```
+
+불필요한 리렌더링을 막기 위해 새 응답과 이전 상태를 `JSON.stringify`로 비교하여 동일하면 상태 업데이트를 건너뜁니다.
+
+#### 3. 브라우저 MediaRecorder API를 활용한 실시간 음성 녹음
+
+Web API `MediaRecorder`를 직접 제어해 별도 라이브러리 없이 음성 녹음 기능을 구현했습니다.
+
+- **슬라이드 타임스탬프 기록**: 슬라이드 전환 시 `performance.now()`로 경과 시간을 측정해 각 슬라이드별 `start_timestamp` / `end_timestamp`를 배열로 구성, 백엔드로 함께 전송합니다.
+- **일시정지 / 재시작**: `mediaRecorder.pause()` / `resume()` 으로 연속 스트림 내에서 자연스러운 일시정지를 지원합니다.
+- **Q&A 연습**: 각 질문에 대해 독립적인 `MediaRecorder` 인스턴스를 생성해 질문별 Blob을 순차적으로 서버에 제출합니다.
+
+#### 4. sessionStorage 기반 크로스 페이지 상태 공유
+
+여러 단계를 거치는 피칭 플로우에서 페이지 간 데이터 전달이 필요합니다.  
+`URL 쿼리 파라미터`(`pitch_id`, `ir_deck_id`, `voice_id`)로 ID를 전달하고, 슬라이드 이미지 URL 배열이나 Q&A 질문 목록처럼 크기가 큰 데이터는 `sessionStorage`에 저장해 페이지 이동 시 유지합니다.
+
+```typescript
+// 슬라이드 이미지: IR Deck 분석 완료 후 sessionStorage 저장
+sessionStorage.setItem("pitch_slides", JSON.stringify(slides));
+
+// 음성 녹음 페이지에서 복원
+const savedSlides = sessionStorage.getItem("pitch_slides");
+```
+
+#### 5. 커스텀 SVG 차트 (외부 차트 라이브러리 미사용)
+
+종합 리포트 페이지의 시각화 컴포넌트를 React + SVG로 직접 구현했습니다.
+
+- **RadarChart**: n각형 그리드를 동적으로 계산, 각 축의 점수에 따라 polygon을 그려 다차원 점수를 한눈에 비교
+- **ScoreRing**: `strokeDashoffset`으로 점수에 비례한 원형 게이지를 표현
+- **ProgressBar**: 토픽 커버리지 점수 75% 기준으로 우수(파랑) / 보완 필요(노랑) 색상을 동적으로 적용
+
+#### 6. Pitch 목록 실시간 검색 (디바운싱)
+
+검색어 입력 시 300ms 디바운싱을 적용해 API 호출 빈도를 줄이고, 상태 필터(전체 / 진행중 / 완료) 변경과 검색어 변경을 동일한 `useEffect`에서 처리합니다.
+
+```typescript
+useEffect(() => {
+  const timer = setTimeout(() => fetchPitches(), 300);
+  return () => clearTimeout(timer);
+}, [statusFilter, searchQuery]);
+```
+
+#### 7. Axios 인터셉터 기반 인증 처리
+
+커스텀 `AxiosInstance`에 요청 인터셉터를 등록해 모든 API 호출에 `localStorage`의 `access_token`을 자동으로 첨부합니다. 인증 오류 시 `refresh_token`으로 갱신하는 흐름을 단일 지점에서 관리합니다.
 
 ---
 
@@ -97,131 +219,81 @@
 
 ---
 
-## 프론트엔드 구현 상세
+## How to Install
 
-### 1. App Router 기반 라우트 그룹 설계
+### 사전 요구사항
 
-Next.js App Router의 라우트 그룹을 활용해 인증(`(auth)`), 메인(`(main)`), 피칭 플로우(`(new)`) 영역을 레이아웃 단위로 분리했습니다.  
-각 그룹은 공통 레이아웃(Sidebar, Header, StepNavbar)을 독립적으로 가지며 불필요한 리렌더링 없이 단계별 UI를 구성합니다.
+| 도구 | 버전 | 확인 방법 |
+|------|------|-----------|
+| **Node.js** | 18.x 이상 | `node -v` |
+| **pnpm** | 10.x 이상 | `pnpm -v` |
 
-```
-src/app/
-├── (auth)/         # 로그인, 회원가입, 온보딩
-├── (main)/         # 홈, Pitch 목록
-└── (new)/
-    ├── notice/     # 공고문 등록 플로우 (basic → type → upload → analysis)
-    └── new/
-        ├── deck/   # IR Deck 업로드 → 분석
-        ├── voice/  # 음성 녹음 → 분석
-        ├── qna/    # Q&A 유형 → 목록 → 연습 → 피드백
-        └── report/ # 종합 리포트
-```
-
-### 2. 비동기 AI 분석 — 폴링(Polling) 패턴
-
-AI 분석은 수십 초~수 분이 소요되는 비동기 작업입니다.  
-분석 상태가 `IN_PROGRESS`인 동안 `setInterval`로 백엔드를 주기적으로 폴링하고, `COMPLETED` 또는 `FAILED` 상태가 반환되면 인터벌을 정리합니다.
-
-```typescript
-// IR Deck 분석 폴링 (10초 간격)
-useEffect(() => {
-  if (data?.analysis_status === "IN_PROGRESS") {
-    const interval = setInterval(() => fetchData(), 10000);
-    return () => clearInterval(interval);
-  }
-}, [data?.analysis_status, fetchData]);
-```
-
-불필요한 리렌더링을 막기 위해 새 응답과 이전 상태를 `JSON.stringify`로 비교하여 동일하면 상태 업데이트를 건너뜁니다.
-
-### 3. 브라우저 MediaRecorder API를 활용한 실시간 음성 녹음
-
-Web API `MediaRecorder`를 직접 제어해 별도 라이브러리 없이 음성 녹음 기능을 구현했습니다.
-
-- **슬라이드 타임스탬프 기록**: 슬라이드 전환 시 `performance.now()`로 경과 시간을 측정해 각 슬라이드별 `start_timestamp` / `end_timestamp`를 배열로 구성, 백엔드로 함께 전송합니다.
-- **일시정지 / 재시작**: `mediaRecorder.pause()` / `resume()` 으로 연속 스트림 내에서 자연스러운 일시정지를 지원합니다.
-- **Q&A 연습**: 각 질문에 대해 독립적인 `MediaRecorder` 인스턴스를 생성해 질문별 Blob을 순차적으로 서버에 제출합니다.
-
-### 4. sessionStorage 기반 크로스 페이지 상태 공유
-
-여러 단계를 거치는 피칭 플로우에서 페이지 간 데이터 전달이 필요합니다.  
-`URL 쿼리 파라미터`(`pitch_id`, `ir_deck_id`, `voice_id`)로 ID를 전달하고, 슬라이드 이미지 URL 배열이나 Q&A 질문 목록처럼 크기가 큰 데이터는 `sessionStorage`에 저장해 페이지 이동 시 유지합니다.
-
-```typescript
-// 슬라이드 이미지: IR Deck 분석 완료 후 sessionStorage 저장
-sessionStorage.setItem("pitch_slides", JSON.stringify(slides));
-
-// 음성 녹음 페이지에서 복원
-const savedSlides = sessionStorage.getItem("pitch_slides");
-```
-
-### 5. 커스텀 SVG 차트 (외부 차트 라이브러리 미사용)
-
-종합 리포트 페이지의 시각화 컴포넌트를 React + SVG로 직접 구현했습니다.
-
-- **RadarChart**: n각형 그리드를 동적으로 계산, 각 축의 점수에 따라 polygon을 그려 다차원 점수를 한눈에 비교
-- **ScoreRing**: `strokeDashoffset`으로 점수에 비례한 원형 게이지를 표현
-- **ProgressBar**: 토픽 커버리지 점수 75% 기준으로 우수(파랑) / 보완 필요(노랑) 색상을 동적으로 적용
-
-### 6. Pitch 목록 실시간 검색 (디바운싱)
-
-검색어 입력 시 300ms 디바운싱을 적용해 API 호출 빈도를 줄이고, 상태 필터(전체 / 진행중 / 완료) 변경과 검색어 변경을 동일한 `useEffect`에서 처리합니다.
-
-```typescript
-useEffect(() => {
-  const timer = setTimeout(() => fetchPitches(), 300);
-  return () => clearTimeout(timer);
-}, [statusFilter, searchQuery]);
-```
-
-### 7. Axios 인터셉터 기반 인증 처리
-
-커스텀 `AxiosInstance`에 요청 인터셉터를 등록해 모든 API 호출에 `localStorage`의 `access_token`을 자동으로 첨부합니다. 인증 오류 시 `refresh_token`으로 갱신하는 흐름을 단일 지점에서 관리합니다.
-
----
-
-## 디렉터리 구조
-
-```
-src/
-├── app/                   # Next.js App Router 페이지
-│   ├── (auth)/            # 인증 관련 페이지
-│   ├── (main)/            # 메인 서비스 페이지
-│   └── (new)/             # 피칭 플로우 페이지
-├── components/
-│   ├── analysis/          # FeedbackSummary, SlideFeedback
-│   ├── common/            # Header, Sidebar, StepNavbar, BottomNextBar, BottomChooseBar
-│   ├── modal/             # PwModal
-│   ├── pitch/             # PitchCard
-│   └── ui/                # Radix UI 래퍼 (Dialog, Popover, Tabs, Command)
-├── apis/
-│   ├── AxiosInstance.ts   # 토큰 인터셉터 포함 Axios 인스턴스
-│   ├── PitchApi.ts        # 피칭 관련 API 함수
-│   └── SignupApi.ts       # 인증 API 함수
-└── types/                 # TypeScript 타입 정의
-    ├── PitchType.ts
-    ├── IRAnalysisType.ts
-    ├── VoiceAnalysisType.ts
-    ├── QNAAnalysisType.ts
-    ├── ReportType.ts
-    └── SignupType.ts
-```
-
----
-
-## 시작하기
+pnpm이 설치되어 있지 않다면:
 
 ```bash
-# 의존성 설치
-pnpm install
+npm install -g pnpm
+```
 
-# 개발 서버 실행
+### 설치 단계
+
+**1. 저장소 클론**
+
+```bash
+git clone <repository-url>
+cd PitchCoach_FE
+```
+
+**2. 의존성 설치**
+
+```bash
+pnpm install
+```
+
+**3. 환경 변수 설정**
+
+프로젝트 루트에 `.env.local` 파일을 생성하고 백엔드 API 주소를 입력합니다.
+
+```bash
+# .env.local
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+```
+
+**4. 개발 서버 실행**
+
+```bash
 pnpm dev
 ```
 
 브라우저에서 [http://localhost:3000](http://localhost:3000) 으로 접속합니다.
 
-> **환경 변수**: 백엔드 API 주소를 `.env.local`에 설정하세요.
-> ```
-> NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-> ```
+---
+
+## How to Build
+
+### 프로덕션 빌드
+
+```bash
+# 1. 프로덕션용 번들 생성
+pnpm build
+
+# 2. 프로덕션 서버 실행
+pnpm start
+```
+
+`pnpm build`는 Next.js의 정적 최적화·코드 분할·이미지 최적화가 적용된 `.next/` 번들을 생성합니다.  
+`pnpm start`는 `.next/` 번들을 기반으로 Node.js 프로덕션 서버를 실행합니다. (기본 포트: 3000)
+
+### 린트 검사
+
+```bash
+pnpm lint
+```
+
+### 스크립트 요약
+
+| 명령어 | 설명 |
+|--------|------|
+| `pnpm dev` | 개발 서버 실행 (Hot Reload 포함) |
+| `pnpm build` | 프로덕션 번들 빌드 |
+| `pnpm start` | 프로덕션 서버 실행 |
+| `pnpm lint` | ESLint 코드 품질 검사 |

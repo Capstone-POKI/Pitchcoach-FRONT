@@ -195,6 +195,11 @@ export const getReport = async (
   return response.data;
 };
 
+export const DeletePitch = async (pitchId: string) => {
+  const response = await api.delete(`/api/pitches/${pitchId}`);
+  return response.data;
+};
+
 export const postQuestionAnswer = async (
   questionId: string,
   audioBlob: Blob,

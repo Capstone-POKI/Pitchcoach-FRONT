@@ -4,8 +4,14 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import BottomNextBar from "@/components/common/BottomNextBar";
-import { generateReport, getReport } from "@/apis/PitchApi";
+import { generateReport, getReport, getAnswerFeedback } from "@/apis/PitchApi";
 import { GenerateReportResponse } from "@/types/ReportType";
+import { QAQuestion, GetAnswerFeedbackResponse } from "@/types/QNAAnalysisType";
+
+interface QnaFeedbackItem {
+  question: QAQuestion;
+  feedback: GetAnswerFeedbackResponse;
+}
 
 // ─── Static criteria (not from API) ──────────────────────────────────────────
 const CRITERIA = [
@@ -214,6 +220,32 @@ function ReportView({
   pitchId: string | null;
 }) {
   const [openQna, setOpenQna] = useState<number | null>(null);
+  const [qnaItems, setQnaItems] = useState<QnaFeedbackItem[]>([]);
+
+  useEffect(() => {
+    if (!pitchId) return;
+
+    const load = async () => {
+      const rawQuestions = sessionStorage.getItem(`qa_questions_${pitchId}`);
+      const rawAnswerIds = sessionStorage.getItem(`qa_answer_ids_${pitchId}`);
+      const questions: QAQuestion[] = rawQuestions ? JSON.parse(rawQuestions) : [];
+      const answerIds: string[] = rawAnswerIds ? JSON.parse(rawAnswerIds) : [];
+
+      if (answerIds.length === 0) {
+        setQnaItems(questions.map((q) => ({ question: q, feedback: null as unknown as GetAnswerFeedbackResponse })));
+        return;
+      }
+
+      try {
+        const feedbacks = await Promise.all(answerIds.map((id) => getAnswerFeedback(id)));
+        setQnaItems(feedbacks.map((feedback, i) => ({ question: questions[i], feedback })));
+      } catch {
+        setQnaItems(questions.map((q) => ({ question: q, feedback: null as unknown as GetAnswerFeedbackResponse })));
+      }
+    };
+
+    load();
+  }, [pitchId]);
 
   const radar = data.radar_chart.labels.map((label, i) => ({
     label,
@@ -230,12 +262,6 @@ function ReportView({
     highlight: item.score >= 75,
     i,
   }));
-
-  const qnaQuestions: { question: string }[] = (() => {
-    if (typeof window === "undefined" || !pitchId) return [];
-    const raw = sessionStorage.getItem(`qa_questions_${pitchId}`);
-    return raw ? JSON.parse(raw) : [];
-  })();
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-24">
@@ -355,14 +381,14 @@ function ReportView({
           </div>
         </div>
 
-        {/* ── Q&A 답변 피드백 (sessionStorage에서 질문 목록) ── */}
-        {qnaQuestions.length > 0 && (
+        {/* ── Q&A 답변 피드백 ── */}
+        {qnaItems.length > 0 && (
           <div className="bg-white rounded-[20px] border border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6">
             <h2 className="text-[16px] font-bold text-[#111] mb-4">
               Q&A 답변 피드백
             </h2>
             <div className="flex flex-col gap-2">
-              {qnaQuestions.map((item, i) => (
+              {qnaItems.map((item, i) => (
                 <div
                   key={i}
                   className="rounded-[12px] border border-gray-100 overflow-hidden"
@@ -375,15 +401,52 @@ function ReportView({
                       {i + 1}
                     </div>
                     <span className="text-[14px] font-medium text-[#111] flex-1">
-                      {item.question}
+                      {item.question.question}
                     </span>
                     <Icon
-                      icon={
-                        openQna === i ? "mdi:chevron-up" : "mdi:chevron-down"
-                      }
+                      icon={openQna === i ? "mdi:chevron-up" : "mdi:chevron-down"}
                       className="w-5 h-5 text-gray-400 shrink-0"
                     />
                   </button>
+                  {openQna === i && (
+                    <div className="px-4 pb-4 flex flex-col gap-3 border-t border-gray-100 pt-3">
+                      {item.feedback?.transcription && (
+                        <div className="bg-[#F4F7FB] rounded-[12px] px-4 py-3">
+                          <p className="text-[12px] font-semibold text-[#111827] mb-1">나의 답변</p>
+                          <p className="text-[13px] leading-6 text-[#4B5563] whitespace-pre-line">
+                            {item.feedback.transcription}
+                          </p>
+                        </div>
+                      )}
+                      {item.feedback?.strengths && (
+                        <div className="bg-[#F0FDF4] rounded-[12px] px-4 py-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Icon icon="mdi:check-circle-outline" className="w-4 h-4 text-green-500" />
+                            <p className="text-[12px] font-semibold text-green-700">강점</p>
+                          </div>
+                          <p className="text-[13px] leading-6 text-[#4B5563] whitespace-pre-line">
+                            {item.feedback.strengths}
+                          </p>
+                        </div>
+                      )}
+                      {item.feedback?.weaknesses && (
+                        <div className="bg-[#FFFBEB] rounded-[12px] px-4 py-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Icon icon="mdi:alert-circle-outline" className="w-4 h-4 text-amber-500" />
+                            <p className="text-[12px] font-semibold text-amber-700">보완점</p>
+                          </div>
+                          <p className="text-[13px] leading-6 text-[#4B5563] whitespace-pre-line">
+                            {item.feedback.weaknesses}
+                          </p>
+                        </div>
+                      )}
+                      {!item.feedback && (
+                        <p className="text-[13px] text-gray-400 text-center py-2">
+                          답변 피드백이 없습니다
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

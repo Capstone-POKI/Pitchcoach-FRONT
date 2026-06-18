@@ -16,39 +16,41 @@ function QnAFeedbackContent() {
   const searchParams = useSearchParams();
   const pitchId = searchParams.get("pitch_id");
 
-  const [questions] = useState<QAQuestion[]>(() => {
-    if (typeof window === "undefined" || !pitchId) return [];
-    const raw = sessionStorage.getItem(`qa_questions_${pitchId}`);
-    return raw ? (JSON.parse(raw) as QAQuestion[]) : [];
-  });
-
-  const [answerIds] = useState<string[]>(() => {
-    if (typeof window === "undefined" || !pitchId) return [];
-    const raw = sessionStorage.getItem(`qa_answer_ids_${pitchId}`);
-    return raw ? (JSON.parse(raw) as string[]) : [];
-  });
-
   const [items, setItems] = useState<FeedbackItem[]>([]);
-  const [loading, setLoading] = useState(() => answerIds.length > 0);
-  const [error, setError] = useState<string | null>(() =>
-    typeof window !== "undefined" && pitchId && answerIds.length === 0
-      ? "피드백 데이터를 찾을 수 없습니다."
-      : null,
-  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (answerIds.length === 0) return;
+    const load = async () => {
+      if (!pitchId) {
+        setError("피드백 데이터를 찾을 수 없습니다.");
+        setLoading(false);
+        return;
+      }
 
-    Promise.all(answerIds.map((id) => getAnswerFeedback(id)))
-      .then((feedbacks) =>
-        setItems(
-          feedbacks.map((feedback, i) => ({ question: questions[i], feedback })),
-        ),
-      )
-      .catch(() => setError("피드백을 불러오는 중 오류가 발생했습니다."))
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      const rawQuestions = sessionStorage.getItem(`qa_questions_${pitchId}`);
+      const rawAnswerIds = sessionStorage.getItem(`qa_answer_ids_${pitchId}`);
+      const questions: QAQuestion[] = rawQuestions ? JSON.parse(rawQuestions) : [];
+      const answerIds: string[] = rawAnswerIds ? JSON.parse(rawAnswerIds) : [];
+
+      if (answerIds.length === 0) {
+        setError("피드백 데이터를 찾을 수 없습니다.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const feedbacks = await Promise.all(answerIds.map((id) => getAnswerFeedback(id)));
+        setItems(feedbacks.map((feedback, i) => ({ question: questions[i], feedback })));
+      } catch {
+        setError("피드백을 불러오는 중 오류가 발생했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [pitchId]);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center pt-8 pb-24">
@@ -155,7 +157,7 @@ function QnAFeedbackContent() {
 
       <BottomNextBar
         disabled={loading}
-        nextHref={`/new/deck/analysis?pitch_id=${pitchId}`}
+        nextHref={`/new/report?pitch_id=${pitchId}`}
       />
     </div>
   );

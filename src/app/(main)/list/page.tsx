@@ -100,7 +100,11 @@ export default function PitchListPage() {
 
           {!loading &&
             pitches.map((pitch) => (
-              <PitchCard key={pitch.pitch_id} pitch={pitch} />
+              <PitchCard
+                key={pitch.pitch_id}
+                pitch={pitch}
+                onDeleted={() => fetchPitches()}
+              />
             ))}
         </div>
       </div>
